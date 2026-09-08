@@ -79,6 +79,19 @@ function isRateLimitError(error: unknown): boolean {
 
 const encoder = new TextEncoder();
 
+/** Cancelamento disparado pelo cliente (fechou o widget / navegou para fora). */
+function isAbortError(error: unknown): boolean {
+  return (error as { name?: unknown })?.name === 'AbortError';
+}
+
+/** Registra uma linha de custo por requisição — base da demonstração de tokens. */
+function logUsage(usage: ChatUsage, outcome: string): void {
+  const cost = estimateCost(usage);
+  console.info(
+    `[chat] modelo=${MODEL_ID} resultado=${outcome} tokens_in=${usage.inputTokens} tokens_out=${usage.outputTokens} custo_usd=${cost.usd.toFixed(6)} custo_brl=${cost.brl.toFixed(6)}`
+  );
+}
+
 function encodeEvent(event: StreamEvent): Uint8Array {
   return encoder.encode(`${JSON.stringify(event)}\n`);
 }
@@ -121,7 +134,9 @@ export async function POST(request: Request): Promise<Response> {
         temperature: TEMPERATURE,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
         // Desliga o "thinking" do Gemini 2.5 Flash: menos latência e menos tokens de saída.
-        thinkingConfig: { thinkingBudget: 0 }
+        thinkingConfig: { thinkingBudget: 0 },
+        // Se o usuário fecha o widget, a geração é cancelada e para de gerar custo.
+        abortSignal: request.signal
       }
     });
   } catch (error) {
@@ -137,13 +152,23 @@ export async function POST(request: Request): Promise<Response> {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let usage: ChatUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+      let outcome = 'ok';
+
+      // Depois de um cancelamento o controller rejeita escritas; ignorar é o comportamento certo.
+      const send = (event: StreamEvent) => {
+        try {
+          controller.enqueue(encodeEvent(event));
+        } catch {
+          // consumidor já desconectou
+        }
+      };
 
       try {
         for await (const chunk of geminiStream) {
           const text = chunk.text;
 
           if (text) {
-            controller.enqueue(encodeEvent({ type: 'text', text }));
+            send({ type: 'text', text });
           }
 
           const metadata = chunk.usageMetadata;
@@ -161,27 +186,33 @@ export async function POST(request: Request): Promise<Response> {
           }
         }
 
-        const cost = estimateCost(usage);
-
-        controller.enqueue(encodeEvent({ type: 'usage', ...usage, cost }));
-        console.info(
-          `[chat] modelo=${MODEL_ID} tokens_in=${usage.inputTokens} tokens_out=${usage.outputTokens} custo_usd=${cost.usd.toFixed(6)} custo_brl=${cost.brl.toFixed(6)}`
-        );
+        send({ type: 'usage', ...usage, cost: estimateCost(usage) });
       } catch (error) {
-        // Stream já iniciado: o erro precisa viajar como evento, não como status HTTP.
-        console.error('[chat] falha durante o stream:', error);
-        const rateLimited = isRateLimitError(error);
-        controller.enqueue(
-          encodeEvent({
+        if (isAbortError(error)) {
+          // Cliente desistiu (fechou o widget): não é falha, e não há ninguém para receber o evento.
+          outcome = 'abortado';
+        } else {
+          // Stream já iniciado: o erro precisa viajar como evento, não como status HTTP.
+          const rateLimited = isRateLimitError(error);
+          outcome = rateLimited ? 'erro_rate_limit' : 'erro';
+          console.error('[chat] falha durante o stream:', error);
+          send({
             type: 'error',
             code: rateLimited ? 'rate_limit' : 'unknown',
             message: rateLimited
               ? 'Limite de requisições atingido. Tente novamente em instantes.'
               : 'A resposta foi interrompida. Tente novamente.'
-          })
-        );
+          });
+        }
       } finally {
-        controller.close();
+        // Uma linha de custo por requisição, inclusive quando a geração falhou ou foi abortada.
+        logUsage(usage, outcome);
+
+        try {
+          controller.close();
+        } catch {
+          // stream já encerrado pelo cliente
+        }
       }
     }
   });
