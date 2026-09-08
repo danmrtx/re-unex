@@ -1,26 +1,104 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --color-unex-navy: #12123c;
+    --color-unex-navy-dark: #0a0d24;
+    --color-unex-navy-light: #1b1b4d;
+    --color-unex-blue: #063173;
+    --color-unex-lime: #97e700;
+    --color-unex-lime-hover: #82c800;
+    --color-unex-lime-light: #f3fde0;
+    --font-size-multiplier: 1;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    font-size: calc(16px * var(--font-size-multiplier));
+  }
+
+  html.font-lg {
+    --font-size-multiplier: 1.125;
+  }
+
+  html.font-xl {
+    --font-size-multiplier: 1.25;
+  }
+
+  html.high-contrast {
+    filter: contrast(125%);
+  }
+
+  body {
+    color: #1e293b;
+    background-color: #ffffff;
+    font-family: var(--font-geist-sans), system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    overflow-x: hidden;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Custom Utilities */
+.bg-unex-navy {
+  background-color: #12123c;
+}
+.bg-unex-navy-dark {
+  background-color: #0a0d24;
+}
+.bg-unex-navy-light {
+  background-color: #1b1b4d;
+}
+.bg-unex-blue {
+  background-color: #063173;
+}
+.bg-unex-lime {
+  background-color: #97e700;
+}
+.bg-unex-lime-hover {
+  background-color: #82c800;
+}
+.bg-unex-lime-light {
+  background-color: #f3fde0;
+}
+
+.text-unex-navy {
+  color: #12123c;
+}
+.text-unex-blue {
+  color: #063173;
+}
+.text-unex-lime {
+  color: #97e700;
+}
+
+.border-unex-lime {
+  border-color: #97e700;
+}
+.border-unex-navy {
+  border-color: #12123c;
+}
+
+/* Glassmorphism */
+.glass-nav {
+  background: rgba(18, 18, 60, 0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Gradient accents */
+.gradient-unex {
+  background: linear-gradient(135deg, #12123c 0%, #063173 50%, #0a1f4d 100%);
+}
+
+.gradient-lime {
+  background: linear-gradient(135deg, #97e700 0%, #7ec200 100%);
+}
+
+.gradient-glow {
+  background: radial-gradient(circle at 50% 50%, rgba(151, 231, 0, 0.15) 0%, rgba(18, 18, 60, 0) 70%);
 }
