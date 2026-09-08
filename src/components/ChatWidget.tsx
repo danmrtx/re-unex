@@ -24,11 +24,15 @@ const SUGGESTIONS = [
   'Como funciona o vestibular online?'
 ];
 
+/** Mensagem genérica usada para qualquer falha que não seja falta de chave ou limite de uso. */
+const GENERIC_ERROR_MESSAGE =
+  'Tive um problema para responder agora. Tente novamente em instantes ou fale conosco pelo WhatsApp.';
+
 const ERROR_MESSAGES: Record<ChatErrorCode, string> = {
   missing_api_key: 'O assistente ainda não foi configurado (chave da API ausente).',
   rate_limit: `Estamos com muitas conversas agora. Tente em instantes ou fale conosco no WhatsApp ${SUPPORT_PHONE}.`,
-  invalid_request: 'Não consegui processar essa mensagem. Tente reformular a pergunta.',
-  unknown: 'Tive um problema para responder agora. Tente novamente em instantes ou fale conosco pelo WhatsApp.'
+  invalid_request: GENERIC_ERROR_MESSAGE,
+  unknown: GENERIC_ERROR_MESSAGE
 };
 
 const numberFormatter = new Intl.NumberFormat('pt-BR');
@@ -56,9 +60,9 @@ interface ChatError {
   message: string;
 }
 
-/** Mostra o link do WhatsApp apenas quando falar com um humano ajuda de fato. */
+/** Sempre oferece o WhatsApp, exceto quando o problema é de configuração do próprio site. */
 function shouldOfferWhatsApp(code: ChatErrorCode): boolean {
-  return code === 'rate_limit' || code === 'unknown';
+  return code !== 'missing_api_key';
 }
 
 export function ChatWidget() {
@@ -71,6 +75,7 @@ export function ChatWidget() {
   const [sessionUsage, setSessionUsage] = useState<SessionUsage>({ totalTokens: 0, brl: 0 });
 
   const abortRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
   const fabRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const listEndRef = useRef<HTMLDivElement>(null);
@@ -86,7 +91,15 @@ export function ChatWidget() {
   }, []);
 
   // Aborta qualquer geração pendente ao desmontar (evita custo desnecessário).
-  useEffect(() => () => abortRef.current?.abort(), []);
+  useEffect(() => {
+    isMountedRef.current = true;
+
+    return () => {
+      isMountedRef.current = false;
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, []);
 
   // Foco no campo de texto assim que o painel abre.
   useEffect(() => {
@@ -245,7 +258,8 @@ export function ChatWidget() {
         dropEmptyAssistantMessage();
         setError({ code: 'unknown', message: ERROR_MESSAGES.unknown });
       } finally {
-        if (abortRef.current === controller) {
+        // Não atualiza estado se o componente já saiu da tela.
+        if (isMountedRef.current && abortRef.current === controller) {
           abortRef.current = null;
           setIsStreaming(false);
         }
@@ -297,7 +311,7 @@ export function ChatWidget() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-bold leading-tight">Assistente Unex</p>
-                <p className="text-[11px] text-white/70 leading-tight">
+                <p className="text-[0.6875rem] text-white/70 leading-tight">
                   Respostas geradas por IA · {MODEL_ID}
                 </p>
               </div>
@@ -324,7 +338,7 @@ export function ChatWidget() {
 
               {!hasUserMessage && (
                 <div className="space-y-2 pt-1">
-                  <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  <p className="flex items-center gap-1.5 text-[0.6875rem] font-bold uppercase tracking-wider text-slate-400">
                     <Sparkles className="w-3.5 h-3.5" />
                     Sugestões
                   </p>
@@ -428,13 +442,13 @@ export function ChatWidget() {
                   <Send className="w-4 h-4" />
                 </button>
               </div>
-              <p className="mt-1 text-[10px] text-slate-400 text-right">
+              <p className="mt-1 text-[0.625rem] text-slate-400 text-right">
                 {numberFormatter.format(input.length)}/{numberFormatter.format(MAX_MESSAGE_LENGTH)} caracteres
               </p>
             </div>
 
             {/* Rodapé com consumo de tokens e custo estimado */}
-            <footer className="border-t border-slate-200 bg-slate-50 px-3 py-2 text-[10px] text-slate-500 leading-relaxed shrink-0">
+            <footer className="border-t border-slate-200 bg-slate-50 px-3 py-2 text-[0.625rem] text-slate-500 leading-relaxed shrink-0">
               <p className="flex items-center gap-1">
                 <span>
                   {lastUsage
@@ -442,7 +456,7 @@ export function ChatWidget() {
                     : 'Última resposta: —'}
                 </span>
                 <span
-                  className="w-3.5 h-3.5 shrink-0 rounded-full bg-slate-200 text-slate-600 text-[9px] font-bold flex items-center justify-center cursor-help"
+                  className="w-3.5 h-3.5 shrink-0 rounded-full bg-slate-200 text-slate-600 text-[0.5625rem] font-bold flex items-center justify-center cursor-help"
                   title={TOKENS_TOOLTIP}
                   aria-label={TOKENS_TOOLTIP}
                   role="img"
