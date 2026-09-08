@@ -163,6 +163,11 @@ export async function POST(request: Request): Promise<Response> {
         }
       };
 
+      // Ordem garantida do stream: usage -> error (quando houver) -> close.
+      const sendUsage = () => {
+        send({ type: 'usage', ...usage, cost: estimateCost(usage) });
+      };
+
       try {
         for await (const chunk of geminiStream) {
           const text = chunk.text;
@@ -186,10 +191,13 @@ export async function POST(request: Request): Promise<Response> {
           }
         }
 
-        send({ type: 'usage', ...usage, cost: estimateCost(usage) });
+        sendUsage();
       } catch (error) {
+        // O consumo já acumulado vale mesmo quando a geração falhou: usage sempre antes do erro.
+        sendUsage();
+
         if (isAbortError(error)) {
-          // Cliente desistiu (fechou o widget): não é falha, e não há ninguém para receber o evento.
+          // Cliente desistiu (fechou o widget): não é falha, e provavelmente não há ninguém escutando.
           outcome = 'abortado';
         } else {
           // Stream já iniciado: o erro precisa viajar como evento, não como status HTTP.

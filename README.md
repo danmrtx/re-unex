@@ -189,6 +189,9 @@ Todos validados **no servidor**, porque o cliente pode ser adulterado:
 - se o usuário fecha o widget, o `AbortController` do cliente cancela a geração no servidor (`abortSignal`), interrompendo o custo;
 - histórico mantido **apenas em memória no React** — nada é persistido.
 
+> **Sem limite por IP.** A rota `/api/chat` **não** aplica *rate limiting* por IP: o teto real é a cota do plano gratuito do Gemini, o que basta para delimitar o pior caso nesta demonstração acadêmica.
+> Em um deploy público, o limitador deve ficar na borda — *rate limiting* do Vercel Firewall/WAF ou um proxy reverso à frente da aplicação.
+
 ### 🎓 Conceitos aplicados
 
 - **Tipos de LLM.** Modelos "Flash" são pequenos, rápidos e baratos — o perfil certo para atendimento, onde as respostas são curtas, factuais e extraídas de uma base pronta. Modelos maiores de raciocínio (que "pensam" antes de responder) custariam várias vezes mais e adicionariam segundos de latência sem melhorar respostas desse tipo. Optou-se por uma **API proprietária** (Gemini) em vez de um modelo aberto auto-hospedado por não exigir infraestrutura de GPU no escopo de um projeto acadêmico.

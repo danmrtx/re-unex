@@ -73,6 +73,8 @@ export function ChatWidget() {
   const [error, setError] = useState<ChatError | null>(null);
   const [lastUsage, setLastUsage] = useState<LastUsage | null>(null);
   const [sessionUsage, setSessionUsage] = useState<SessionUsage>({ totalTokens: 0, brl: 0 });
+  /** Texto anunciado por leitores de tela apenas quando a resposta termina de ser gerada. */
+  const [liveAnnouncement, setLiveAnnouncement] = useState('');
 
   const abortRef = useRef<AbortController | null>(null);
   const isMountedRef = useRef(true);
@@ -86,6 +88,8 @@ export function ChatWidget() {
     abortRef.current?.abort();
     abortRef.current = null;
     setIsStreaming(false);
+    setError(null);
+    setLiveAnnouncement('');
     setIsOpen(false);
     fabRef.current?.focus();
   }, []);
@@ -190,7 +194,13 @@ export function ChatWidget() {
       abortRef.current = controller;
 
       // A mensagem de boas-vindas é local e nunca vai para o servidor.
-      const history = [...messages, { role: 'user' as const, content }].slice(-MAX_HISTORY_MESSAGES);
+      // Bolhas vazias (resposta abortada antes do primeiro texto) são descartadas: o servidor as rejeita com 400.
+      const recent = [...messages, { role: 'user' as const, content }]
+        .filter((message) => message.content.trim().length > 0)
+        .slice(-MAX_HISTORY_MESSAGES);
+      // O histórico precisa começar por uma mensagem do usuário.
+      const firstUserIndex = recent.findIndex((message) => message.role === 'user');
+      const history = firstUserIndex > 0 ? recent.slice(firstUserIndex) : recent;
 
       setMessages((previous) => [
         ...previous,
@@ -199,7 +209,12 @@ export function ChatWidget() {
       ]);
       setInput('');
       setError(null);
+      setLiveAnnouncement('');
       setIsStreaming(true);
+
+      // Acompanha o que chegou pelo stream para decidir o que anunciar/exibir no final.
+      let streamedText = '';
+      let receivedError = false;
 
       try {
         const response = await fetch('/api/chat', {
@@ -229,7 +244,15 @@ export function ChatWidget() {
           }
 
           try {
-            handleStreamEvent(JSON.parse(trimmed) as StreamEvent);
+            const event = JSON.parse(trimmed) as StreamEvent;
+
+            if (event.type === 'text') {
+              streamedText += event.text;
+            } else if (event.type === 'error') {
+              receivedError = true;
+            }
+
+            handleStreamEvent(event);
           } catch {
             // Linha incompleta ou inválida: ignorar é melhor do que quebrar a conversa.
           }
@@ -250,8 +273,18 @@ export function ChatWidget() {
 
         consumeLine(buffer);
         dropEmptyAssistantMessage();
+
+        if (streamedText.trim().length > 0) {
+          // Anuncia a resposta completa uma única vez, e não a cada pedaço recebido.
+          setLiveAnnouncement(streamedText);
+        } else if (!receivedError) {
+          // Stream terminou sem texto e sem erro: avisa em vez de sumir com a bolha silenciosamente.
+          setError({ code: 'unknown', message: ERROR_MESSAGES.unknown });
+        }
       } catch (streamError) {
         if ((streamError as { name?: string })?.name === 'AbortError') {
+          // Sem isso, a bolha vazia fica no histórico e é rejeitada pelo servidor no próximo envio.
+          dropEmptyAssistantMessage();
           return;
         }
 
@@ -281,7 +314,15 @@ export function ChatWidget() {
       <button
         ref={fabRef}
         type="button"
-        onClick={() => (isOpen ? closeWidget() : setIsOpen(true))}
+        onClick={() => {
+          if (isOpen) {
+            closeWidget();
+            return;
+          }
+
+          setError(null);
+          setIsOpen(true);
+        }}
         className="w-12 h-12 rounded-full bg-unex-navy hover:bg-unex-navy-light border-2 border-unex-lime text-white flex items-center justify-center shadow-2xl transition-all duration-200 hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#97e700] focus-visible:ring-offset-2"
         title={isOpen ? 'Fechar assistente virtual' : 'Falar com o assistente virtual'}
         aria-label={isOpen ? 'Fechar assistente virtual Unex' : 'Abrir assistente virtual Unex'}
@@ -329,7 +370,6 @@ export function ChatWidget() {
             {/* Lista de mensagens */}
             <div
               className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50 text-sm text-slate-700"
-              aria-live="polite"
               aria-busy={isStreaming}
             >
               <div className="max-w-[85%] rounded-2xl rounded-tl-sm bg-white border border-slate-200 px-3 py-2 leading-relaxed">
@@ -412,6 +452,11 @@ export function ChatWidget() {
               )}
 
               <div ref={listEndRef} />
+            </div>
+
+            {/* Região viva dedicada: anuncia só a resposta finalizada, fora do fluxo visual. */}
+            <div className="sr-only" aria-live="polite" aria-atomic="true">
+              {liveAnnouncement}
             </div>
 
             {/* Campo de envio */}
