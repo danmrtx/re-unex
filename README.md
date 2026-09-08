@@ -91,12 +91,13 @@ npm start
 
 ## 🤖 Chatbot com IA (Gemini)
 
-A landing page inclui uma assistente virtual de atendimento que responde dúvidas sobre **cursos, campi, formas de ingresso e FAQ** da Unex. Ela usa a API do **Google Gemini** (modelo `gemini-2.5-flash`) através do SDK oficial `@google/genai`.
+A landing page inclui uma assistente virtual de atendimento que responde dúvidas sobre **cursos, campi, formas de ingresso e FAQ** da Unex. Ela usa a API do **Google Gemini** (modelo `gemini-3.5-flash-lite`) através do SDK oficial `@google/genai`.
 
 ### 🔑 Configuração da chave de API
 
 1. Acesse o **Google AI Studio**: <https://aistudio.google.com/apikey>
 2. Faça login com uma conta Google e clique em **Create API key** (o *free tier* do AI Studio é suficiente para testes e para a apresentação).
+   > Modelos da geração 2.5 não estão mais disponíveis para contas novas do Google AI Studio; por isso o projeto usa `gemini-3.5-flash-lite`.
 3. Na raiz do projeto, copie o arquivo de exemplo e cole a chave:
 
 ```bash
@@ -128,7 +129,7 @@ GEMINI_API_KEY=sua_chave_aqui
 │  {type:"error"}      │                                    ▼
 └──────────────────────┘                         ┌──────────────────────┐
                                                  │  Google Gemini API   │
-                                                 │  gemini-2.5-flash    │
+                                                 │ gemini-3.5-flash-lite│
                                                  └──────────────────────┘
 ```
 
@@ -158,7 +159,7 @@ Erros que acontecem **antes** do stream viram respostas HTTP normais: `400` (bod
 
 ### 💰 Custo de tokens
 
-Preços do `gemini-2.5-flash` no *tier* pago (fonte: [Gemini API Pricing](https://ai.google.dev/gemini-api/docs/pricing), consultado em 08/09/2026):
+Preços do `gemini-3.5-flash-lite` no *tier* pago (fonte: [Gemini API Pricing](https://ai.google.dev/gemini-api/docs/pricing), consultado em 08/09/2026):
 
 | Direção | Preço por 1 milhão de tokens |
 |---|---|
@@ -185,7 +186,7 @@ Todos validados **no servidor**, porque o cliente pode ser adulterado:
 - **1.000 caracteres** por mensagem;
 - `maxOutputTokens`: **512** (teto de gasto na saída, que é a parte cara);
 - `temperature`: **0.4** (respostas mais previsíveis, adequadas a atendimento);
-- *thinking* desligado (`thinkingBudget: 0`) — menos latência e menos tokens de saída;
+- *thinking* no nível mínimo (`thinkingLevel: MINIMAL`) — menos latência e menos tokens de saída;
 - se o usuário fecha o widget, o `AbortController` do cliente cancela a geração no servidor (`abortSignal`), interrompendo o custo;
 - histórico mantido **apenas em memória no React** — nada é persistido.
 
@@ -194,7 +195,7 @@ Todos validados **no servidor**, porque o cliente pode ser adulterado:
 
 ### 🎓 Conceitos aplicados
 
-- **Tipos de LLM.** Modelos "Flash" são pequenos, rápidos e baratos — o perfil certo para atendimento, onde as respostas são curtas, factuais e extraídas de uma base pronta. Modelos maiores de raciocínio (que "pensam" antes de responder) custariam várias vezes mais e adicionariam segundos de latência sem melhorar respostas desse tipo. Optou-se por uma **API proprietária** (Gemini) em vez de um modelo aberto auto-hospedado por não exigir infraestrutura de GPU no escopo de um projeto acadêmico.
+- **Tipos de LLM.** Modelos "Flash-Lite" são o menor e mais barato nível da família Flash — pequenos, rápidos e baratos — o perfil certo para atendimento, onde as respostas são curtas, factuais e extraídas de uma base pronta. Modelos maiores de raciocínio (que "pensam" antes de responder) custariam várias vezes mais e adicionariam segundos de latência sem melhorar respostas desse tipo. Optou-se por uma **API proprietária** (Gemini) em vez de um modelo aberto auto-hospedado por não exigir infraestrutura de GPU no escopo de um projeto acadêmico.
 - **Custo de tokens.** Token é a unidade que o modelo lê e escreve (≈ 4 caracteres). Entrada e saída têm preços diferentes — aqui a saída custa **8,3× mais** que a entrada — e o *system prompt* entra na conta de **toda** requisição. Daí as duas alavancas de economia usadas: um prompt enxuto e um teto de tokens de saída.
 - **Arquitetura de integração.** A chave fica no servidor porque qualquer variável entregue ao navegador é pública; o *streaming* melhora a percepção de velocidade sem alterar o custo; e os limites vivem no Route Handler, o único ponto que o usuário não controla. A base de conhecimento é injetada inteira no prompt (sem RAG), o que é simples e suficiente para um volume de dados pequeno e estável.
 

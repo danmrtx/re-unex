@@ -1,4 +1,4 @@
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel } from '@google/genai';
 
 import { SYSTEM_PROMPT } from '@/lib/chat-prompt';
 import type { ChatErrorCode, ChatMessage, ChatUsage, StreamEvent } from '@/lib/chat-types';
@@ -133,8 +133,8 @@ export async function POST(request: Request): Promise<Response> {
         systemInstruction: SYSTEM_PROMPT,
         temperature: TEMPERATURE,
         maxOutputTokens: MAX_OUTPUT_TOKENS,
-        // Desliga o "thinking" do Gemini 2.5 Flash: menos latência e menos tokens de saída.
-        thinkingConfig: { thinkingBudget: 0 },
+        // Mantém o "thinking" no nível mínimo: menos latência e menos tokens de saída.
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         // Se o usuário fecha o widget, a geração é cancelada e para de gerar custo.
         abortSignal: request.signal
       }

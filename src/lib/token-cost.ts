@@ -1,10 +1,10 @@
 import type { ChatCost, ChatUsage } from '@/lib/chat-types';
 
 /** Modelo Gemini usado pelo chatbot (rápido e barato, adequado a atendimento). */
-export const MODEL_ID = 'gemini-2.5-flash';
+export const MODEL_ID = 'gemini-3.5-flash-lite';
 
 /**
- * Preços do gemini-2.5-flash em US$ por 1 milhão de tokens (tier pago).
+ * Preços do gemini-3.5-flash-lite em US$ por 1 milhão de tokens (tier pago).
  * Fonte: https://ai.google.dev/gemini-api/docs/pricing — consultado em 2026-09-08.
  */
 export const PRICING = {
