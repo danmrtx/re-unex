@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { ArrowUp, MessageCircle } from 'lucide-react';
+import { ChatWidget } from '@/components/ChatWidget';
 
 export function FloatingActions() {
   const [showScrollTop, setShowScrollTop] = useState(false);
@@ -35,6 +36,9 @@ export function FloatingActions() {
           <ArrowUp className="w-5 h-5" />
         </button>
       )}
+
+      {/* Assistente Virtual com IA (FAB + painel de chat) */}
+      <ChatWidget />
 
       {/* Floating WhatsApp Action */}
       <a
